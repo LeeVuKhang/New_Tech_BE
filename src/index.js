@@ -21,7 +21,7 @@ app.set('io', io);
 db`SELECT 1`.then(() => {
   console.log('Database connected successfully to Supabase');
   
-  httpServer.listen(PORT, () => {
+  httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Socket.io ready for connections`);
   });
