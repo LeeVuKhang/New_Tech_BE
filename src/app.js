@@ -9,6 +9,7 @@ import { errorHandler } from './middlewares/error.js';
 
 const app = express();
 
+app.set('trust proxy', 1);
 // Security Middleware
 app.use(helmet()); // Secure HTTP headers
 app.use(cors({
