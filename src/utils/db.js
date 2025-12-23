@@ -14,6 +14,7 @@ const db = postgres(connectionString, {
   max: 10,            
   idle_timeout: 20,   
   connect_timeout: 30,  // Increased from 10 to 30 seconds for slow connections
+  prepare: false,
 });
 
 export default db;
