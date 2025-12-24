@@ -37,13 +37,13 @@ const triggerOnboardingWebhook = async (data) => {
     });
 
     if (!response.ok) {
-      console.warn(`⚠️ n8n webhook returned ${response.status}: ${await response.text()}`);
+      console.warn(`n8n webhook returned ${response.status}: ${await response.text()}`);
     } else {
-      console.log(`✅ Onboarding webhook triggered for user ${data.username} in team ${data.teamName}`);
+      console.log(`Onboarding webhook triggered for user ${data.username} in team ${data.teamName}`);
     }
   } catch (error) {
     // Don't fail the invitation accept if webhook fails
-    console.error('❌ Failed to trigger onboarding webhook:', error.message);
+    console.error('Failed to trigger onboarding webhook:', error.message);
   }
 };
 
