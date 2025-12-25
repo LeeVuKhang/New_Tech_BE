@@ -16,7 +16,7 @@ import db from '../utils/db.js';
  */
 const triggerOnboardingWebhook = async (data) => {
   const webhookUrl = process.env.N8N_ONBOARDING_WEBHOOK_URL;
-  
+
   if (!webhookUrl) {
     console.log('N8N_ONBOARDING_WEBHOOK_URL not configured, skipping webhook');
     return;
@@ -189,10 +189,26 @@ export const acceptInvitation = async (req, res, next) => {
         // Emit via Socket.io
         const io = req.app.get('io');
         if (io) {
+          // 1. Notify the specific user (personal notification)
           io.to(`user:${userId}`).emit('notification', notification);
+
+          // 2. Notify the team that a new member has joined (for real-time member list update)
+          io.to(`team:${result.teamId}`).emit('member-joined', {
+            teamId: result.teamId,
+            member: {
+              id: result.id, // This might be invitation ID from model, but we need user info
+              user_id: userId,
+              username: req.user.username,
+              avatar_url: null, // We don't have this in req.user usually, might need to fetch or ignore for now
+              role: result.role || 'member',
+              email: userEmail,
+              joined_at: new Date().toISOString()
+            }
+          });
+          console.log(`Member joined event sent to team:${result.teamId}`);
         }
       } catch (notifError) {
-        console.error('Failed to create acceptance notification:', notifError);
+        console.error('Failed to emit socket events:', notifError);
       }
     }
 
@@ -329,33 +345,25 @@ export const createInvitation = async (req, res, next) => {
       SELECT id FROM users WHERE email = ${email}
     `;
 
-    // If user exists, create notification and emit via Socket.io
+    // If user exists, emit real-time invitation event via Socket.io
+    // NOTE: We don't create a notification here - invitations are managed separately
+    // via getUserInvitations query. This prevents duplicate entries.
     if (invitedUser) {
-      try {
-        const notification = await createNotification({
-          userId: invitedUser.id,
-          title: `Team Invitation`,
-          message: `${teamInfo.inviter_name} invited you to join ${teamInfo.team_name}`,
-          type: 'info',
-          source: 'system',
-          resourceType: 'team',
-          resourceId: parseInt(teamId),
-          metadata: {
-            invitationId: invitation.id,
-            token: invitation.token,
-            role: role || 'member',
-          },
+      const io = req.app.get('io');
+      if (io) {
+        // Emit a dedicated invitation event (not a notification)
+        io.to(`user:${invitedUser.id}`).emit('new-invitation', {
+          id: invitation.id,
+          token: invitation.token,
+          team_id: parseInt(teamId),
+          team_name: teamInfo.team_name,
+          inviter_name: teamInfo.inviter_name,
+          inviter_id: inviterId,
+          role: role || 'member',
+          created_at: new Date().toISOString(),
+          expires_at: invitation.expiresAt,
         });
-
-        // Emit real-time notification via Socket.io
-        const io = req.app.get('io');
-        if (io) {
-          io.to(`user:${invitedUser.id}`).emit('notification', notification);
-          console.log(`Invitation notification sent to user ${invitedUser.id}`);
-        }
-      } catch (notifError) {
-        console.error('Failed to create invitation notification:', notifError);
-        // Don't fail the invitation creation if notification fails
+        console.log(`Invitation event sent to user ${invitedUser.id}`);
       }
     }
 

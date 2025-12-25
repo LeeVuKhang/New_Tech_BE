@@ -54,7 +54,7 @@ db.options.debug = process.env.NODE_ENV === 'development';
 
 // Keep-alive query to prevent connection drops
 // Run every 4 minutes (before Render's 5-minute idle check)
-const KEEP_ALIVE_INTERVAL = 4 * 60 * 1000; // 4 minutes
+const KEEP_ALIVE_INTERVAL = 3 * 60 * 1000; // 3 minutes
 
 const keepAlive = async () => {
   try {
@@ -68,7 +68,7 @@ const keepAlive = async () => {
 // Only run keep-alive in production
 if (process.env.NODE_ENV === 'production') {
   setInterval(keepAlive, KEEP_ALIVE_INTERVAL);
-  console.log('[DB] Keep-alive enabled (every 4 minutes)');
+  console.log('[DB] Keep-alive enabled (every 3 minutes)');
 }
 
 export default db;
