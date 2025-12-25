@@ -343,3 +343,60 @@ export const deleteChannel = async (channelId, teamId, userId) => {
 
   console.log(`[deleteChannel] Channel ${channelId} deleted successfully`);
 };
+
+/**
+ * Withdraw (soft-delete) a message
+ * Replaces message content with withdrawal notice instead of hard delete
+ * @param {number} messageId - Message ID to withdraw
+ * @param {number} channelId - Channel ID for verification
+ * @param {number} userId - User requesting withdrawal (must be message owner)
+ * @returns {Promise<Object>} Updated message
+ * SECURITY: Only message owner can withdraw their own messages
+ */
+export const withdrawMessage = async (messageId, channelId, userId) => {
+  // SECURITY: Verify message exists and user is the owner
+  const [message] = await db`
+    SELECT id, user_id, channel_id, content, is_withdrawn 
+    FROM messages 
+    WHERE id = ${messageId} AND channel_id = ${channelId}
+  `;
+
+  if (!message) {
+    throw new Error('Message not found');
+  }
+
+  // SECURITY: Only the message owner can withdraw
+  if (message.user_id !== userId) {
+    throw new Error('Access denied: You can only withdraw your own messages');
+  }
+
+  // Check if already withdrawn
+  if (message.is_withdrawn) {
+    throw new Error('Message has already been withdrawn');
+  }
+
+  // Soft delete: Update content and mark as withdrawn
+  const WITHDRAWN_TEXT = 'This message has been withdrawn.';
+
+  const [updatedMessage] = await db`
+    UPDATE messages 
+    SET content = ${WITHDRAWN_TEXT}, 
+        is_withdrawn = true, 
+        attachment_url = NULL
+    WHERE id = ${messageId}
+    RETURNING id, channel_id, user_id, content, is_withdrawn, created_at
+  `;
+
+  // Fetch user info for the response
+  const [user] = await db`
+    SELECT username, avatar_url FROM users WHERE id = ${userId}
+  `;
+
+  return {
+    ...updatedMessage,
+    user: {
+      username: user.username,
+      avatar_url: user.avatar_url,
+    },
+  };
+};

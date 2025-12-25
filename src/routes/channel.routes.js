@@ -6,6 +6,7 @@ import upload from '../middlewares/upload.js';
 import {
   teamIdParamSchema,
   teamChannelParamsSchema,
+  teamChannelMessageParamsSchema,
   createChannelSchema,
   createMessageSchema,
   messagesQuerySchema,
@@ -127,6 +128,19 @@ router.post(
   verifyTeamMember,
   upload.array('files', 5), // Handle up to 5 files with field name 'files'
   ChannelController.createMessage
+);
+
+/**
+ * DELETE /teams/:teamId/channels/:channelId/messages/:messageId
+ * Withdraw (soft-delete) a message
+ * Replaces content with "This message has been withdrawn."
+ * Access: Message owner only
+ */
+router.delete(
+  '/:channelId/messages/:messageId',
+  validate({ params: teamChannelMessageParamsSchema }),
+  verifyTeamMember,
+  ChannelController.withdrawMessage
 );
 
 /**

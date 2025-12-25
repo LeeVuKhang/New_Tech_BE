@@ -42,8 +42,8 @@ const scrapeUrlMetadata = async (url) => {
   try {
     // Dynamic import of open-graph-scraper
     const ogs = (await import('open-graph-scraper')).default;
-    
-    const options = { 
+
+    const options = {
       url,
       timeout: 5000, // 5 second timeout to not block too long
       fetchOptions: {
@@ -52,14 +52,14 @@ const scrapeUrlMetadata = async (url) => {
         }
       }
     };
-    
+
     const { result, error } = await ogs(options);
-    
+
     if (error || !result.success) {
       console.log(`[scrapeUrlMetadata] Failed to scrape ${url}:`, error);
       return { title: null, description: null, imageUrl: null };
     }
-    
+
     return {
       title: result.ogTitle || result.twitterTitle || result.dcTitle || null,
       description: result.ogDescription || result.twitterDescription || result.dcDescription || null,
@@ -80,12 +80,12 @@ const processMessageLinks = async (messageId, content) => {
   try {
     const url = extractFirstUrl(content);
     if (!url) return;
-    
+
     const domain = extractDomain(url);
-    
+
     // Scrape metadata (this can take a few seconds)
     const { title, description, imageUrl } = await scrapeUrlMetadata(url);
-    
+
     // Save to database
     await MessageLinkModel.createMessageLink({
       messageId,
@@ -95,7 +95,7 @@ const processMessageLinks = async (messageId, content) => {
       imageUrl,
       domain
     });
-    
+
     console.log(`[processMessageLinks] Saved link metadata for message ${messageId}: ${url}`);
   } catch (err) {
     console.error(`[processMessageLinks] Error processing links for message ${messageId}:`, err.message);
@@ -237,7 +237,7 @@ export const createChannel = async (req, res, next) => {
   try {
     const { teamId } = req.validated?.params || req.params;
     const userId = req.user.id;
-    
+
     // Use validated body - Zod already sanitized and validated these
     const { name, type, projectId, isPrivate } = req.validated?.body || req.body;
 
@@ -257,7 +257,7 @@ export const createChannel = async (req, res, next) => {
     });
   } catch (error) {
     console.error('[createChannel] Error:', error.message);
-    
+
     // Handle duplicate channel name (PostgreSQL unique constraint violation)
     if (error.code === '23505') {
       return res.status(409).json({
@@ -265,7 +265,7 @@ export const createChannel = async (req, res, next) => {
         message: 'A channel with this name already exists in the team',
       });
     }
-    
+
     // Handle project validation errors
     if (error.message.includes('Project not found')) {
       return res.status(400).json({
@@ -273,7 +273,7 @@ export const createChannel = async (req, res, next) => {
         message: error.message,
       });
     }
-    
+
     // Handle access denied (shouldn't happen if middleware is configured correctly)
     if (error.message.includes('Access denied')) {
       return res.status(403).json({
@@ -281,7 +281,7 @@ export const createChannel = async (req, res, next) => {
         message: error.message,
       });
     }
-    
+
     next(error);
   }
 };
@@ -332,13 +332,13 @@ export const createMessage = async (req, res, next) => {
   try {
     const { channelId } = req.validated?.params || req.params;
     const userId = req.user.id;
-    
+
     // Get content from body (may come from FormData or JSON)
     const content = (req.body.content || '').trim();
-    
+
     // Collect all uploaded files from multer-s3
     const uploadedFiles = req.files || [];
-    
+
     // Log uploaded files for debugging
     if (uploadedFiles.length > 0) {
       console.log(`[createMessage] ${uploadedFiles.length} file(s) uploaded to S3:`);
@@ -371,10 +371,10 @@ export const createMessage = async (req, res, next) => {
       for (let i = 0; i < uploadedFiles.length; i++) {
         const file = uploadedFiles[i];
         const attachmentUrl = file.location;
-        
+
         // First message gets the text content, subsequent messages get empty content
         const messageContent = i === 0 ? content : '';
-        
+
         const message = await ChannelModel.createMessage(
           { channelId, content: messageContent, attachmentUrl },
           userId
@@ -498,6 +498,68 @@ export const getChannelLinks = async (req, res, next) => {
         message: error.message,
       });
     }
+    next(error);
+  }
+};
+
+/**
+ * DELETE /teams/:teamId/channels/:channelId/messages/:messageId
+ * Withdraw (soft-delete) a message
+ * 
+ * Security: Only message owner can withdraw their own messages
+ * Action: Replaces content with "This message has been withdrawn."
+ */
+export const withdrawMessage = async (req, res, next) => {
+  try {
+    const { channelId, messageId } = req.validated?.params || req.params;
+    const userId = req.user.id;
+
+    console.log(`[withdrawMessage] User ${userId} withdrawing message ${messageId} in channel ${channelId}`);
+
+    const updatedMessage = await ChannelModel.withdrawMessage(messageId, channelId, userId);
+
+    console.log(`[withdrawMessage] Message ${messageId} withdrawn successfully`);
+
+    // Emit socket event for real-time UI update
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`channel:${channelId}`).emit('message-withdrawn', {
+        messageId: parseInt(messageId),
+        channelId: parseInt(channelId),
+        content: updatedMessage.content,
+        is_withdrawn: true,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Message withdrawn successfully',
+      data: updatedMessage,
+    });
+  } catch (error) {
+    console.error('[withdrawMessage] Error:', error.message);
+
+    if (error.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found',
+      });
+    }
+
+    if (error.message.includes('Access denied') || error.message.includes('only withdraw your own')) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (error.message.includes('already been withdrawn')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
     next(error);
   }
 };

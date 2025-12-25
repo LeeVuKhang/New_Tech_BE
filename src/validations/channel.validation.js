@@ -46,6 +46,28 @@ export const teamChannelParamsSchema = z.object({
     .refine((val) => val > 0, 'Channel ID must be greater than 0'),
 });
 
+/**
+ * Validate combined teamId, channelId, and messageId params
+ * Used for message-specific operations (withdraw, edit, etc.)
+ */
+export const teamChannelMessageParamsSchema = z.object({
+  teamId: z
+    .string()
+    .regex(/^\d+$/, 'Team ID must be a positive integer')
+    .transform(Number)
+    .refine((val) => val > 0, 'Team ID must be greater than 0'),
+  channelId: z
+    .string()
+    .regex(/^\d+$/, 'Channel ID must be a positive integer')
+    .transform(Number)
+    .refine((val) => val > 0, 'Channel ID must be greater than 0'),
+  messageId: z
+    .string()
+    .regex(/^\d+$/, 'Message ID must be a positive integer')
+    .transform(Number)
+    .refine((val) => val > 0, 'Message ID must be greater than 0'),
+});
+
 // === BODY VALIDATORS ===
 
 /**
