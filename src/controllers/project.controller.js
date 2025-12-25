@@ -131,6 +131,12 @@ export const createTask = async (req, res, next) => {
 
     const newTask = await ProjectModel.createTask(projectId, userId, taskData);
 
+    // Real-time: Broadcast task-created to all project members
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`project:${projectId}`).emit('task-created', newTask);
+    }
+
     res.status(201).json({
       success: true,
       message: 'Task created successfully',
@@ -144,7 +150,7 @@ export const createTask = async (req, res, next) => {
         message: 'Access denied: You are not a member of this project',
       });
     }
-    
+
     if (error.message.includes('Only lead or editor')) {
       return res.status(403).json({
         success: false,
@@ -181,6 +187,12 @@ export const updateTask = async (req, res, next) => {
         success: false,
         message: 'Task not found or does not belong to this project',
       });
+    }
+
+    // Real-time: Broadcast task-updated to all project members
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`project:${projectId}`).emit('task-updated', updatedTask);
     }
 
     res.status(200).json({
@@ -239,6 +251,12 @@ export const deleteTask = async (req, res, next) => {
       });
     }
 
+    // Real-time: Broadcast task-deleted to all project members
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`project:${projectId}`).emit('task-deleted', { taskId: parseInt(taskId) });
+    }
+
     res.status(200).json({
       success: true,
       message: 'Task deleted successfully',
@@ -281,6 +299,12 @@ export const createProject = async (req, res, next) => {
 
     const newProject = await ProjectModel.createProject(teamId, userId, projectData);
 
+    // Real-time: Broadcast project-created to all team members
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`team:${teamId}`).emit('project-created', newProject);
+    }
+
     res.status(201).json({
       success: true,
       message: 'Project created successfully',
@@ -316,6 +340,12 @@ export const updateProject = async (req, res, next) => {
     const updates = req.body;
 
     const updatedProject = await ProjectModel.updateProject(projectId, teamId, userId, updates);
+
+    // Real-time: Broadcast project-updated to all team members
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`team:${teamId}`).emit('project-updated', updatedProject);
+    }
 
     res.status(200).json({
       success: true,
@@ -358,6 +388,12 @@ export const deleteProject = async (req, res, next) => {
     const userId = req.user.id;
 
     await ProjectModel.deleteProject(projectId, teamId, userId);
+
+    // Real-time: Broadcast project-deleted to all team members
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`team:${teamId}`).emit('project-deleted', { projectId: parseInt(projectId) });
+    }
 
     res.status(200).json({
       success: true,
@@ -450,9 +486,9 @@ export const removeProjectMember = async (req, res, next) => {
     const { forceRemove } = req.query;
 
     const result = await ProjectModel.removeProjectMember(
-      projectId, 
-      requesterId, 
-      parseInt(userId), 
+      projectId,
+      requesterId,
+      parseInt(userId),
       forceRemove === 'true'
     );
 

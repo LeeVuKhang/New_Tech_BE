@@ -48,19 +48,19 @@ const extractDomain = (url) => {
 const scrapeUrlMetadata = async (url) => {
   try {
     const ogs = (await import('open-graph-scraper')).default;
-    const { result, error } = await ogs({ 
-      url, 
+    const { result, error } = await ogs({
+      url,
       timeout: 5000,
       fetchOptions: {
         headers: { 'user-agent': 'Mozilla/5.0 (compatible; TeamManagementBot/1.0)' }
       }
     });
-    
+
     if (error || !result.success) {
       console.log(`[scrapeUrlMetadata] Failed to scrape ${url}`);
       return { title: null, description: null, imageUrl: null };
     }
-    
+
     return {
       title: result.ogTitle || result.twitterTitle || null,
       description: result.ogDescription || result.twitterDescription || null,
@@ -79,10 +79,10 @@ const processMessageLinks = async (messageId, content) => {
   try {
     const url = extractFirstUrl(content);
     if (!url) return;
-    
+
     const domain = extractDomain(url);
     const { title, description, imageUrl } = await scrapeUrlMetadata(url);
-    
+
     await MessageLinkModel.createMessageLink({
       messageId,
       url,
@@ -91,7 +91,7 @@ const processMessageLinks = async (messageId, content) => {
       imageUrl,
       domain
     });
-    
+
     console.log(`[processMessageLinks] Saved link for message ${messageId}: ${url}`);
   } catch (err) {
     console.error(`[processMessageLinks] Error: ${err.message}`);
@@ -124,7 +124,7 @@ export const initializeSocket = (httpServer) => {
     try {
       // Extract JWT from multiple sources
       let token = socket.handshake.auth?.token;
-      
+
       // If not in auth, try to parse from cookie header
       if (!token && socket.handshake.headers.cookie) {
         const cookies = socket.handshake.headers.cookie.split(';');
@@ -136,7 +136,7 @@ export const initializeSocket = (httpServer) => {
           }
         }
       }
-      
+
       if (!token) {
         console.warn('Socket connection rejected: Missing authentication token');
         console.log('Auth token:', socket.handshake.auth?.token);
@@ -147,7 +147,7 @@ export const initializeSocket = (httpServer) => {
       // Verify JWT token
       const jwt = await import('jsonwebtoken');
       const decoded = jwt.default.verify(token, process.env.JWT_SECRET);
-      
+
       if (!decoded.userId) {
         return next(new Error('Invalid token payload'));
       }
@@ -186,6 +186,96 @@ export const initializeSocket = (httpServer) => {
     const userRoom = `user:${socket.user.id}`;
     socket.join(userRoom);
     console.log(`📬 ${socket.user.username} joined personal notification room: ${userRoom}`);
+
+    /**
+     * JOIN TEAM
+     * Subscribe to team room for real-time project updates
+     * When a project is created/updated/deleted in this team, all members see it
+     */
+    socket.on('join-team', async (data, callback) => {
+      try {
+        const teamId = data?.teamId;
+        if (!teamId) {
+          return callback?.({ success: false, error: 'Invalid team ID' });
+        }
+
+        // Join the team room
+        const roomName = `team:${teamId}`;
+        socket.join(roomName);
+
+        console.log(`${socket.user.username} joined team room: ${roomName}`);
+        callback?.({ success: true });
+      } catch (error) {
+        console.error('Join team error:', error.message);
+        callback?.({ success: false, error: 'Failed to join team room' });
+      }
+    });
+
+    /**
+     * LEAVE TEAM
+     * Unsubscribe from team room
+     */
+    socket.on('leave-team', async (data, callback) => {
+      try {
+        const teamId = data?.teamId;
+        if (!teamId) {
+          return callback?.({ success: false, error: 'Invalid team ID' });
+        }
+
+        const roomName = `team:${teamId}`;
+        socket.leave(roomName);
+
+        console.log(`${socket.user.username} left team room: ${roomName}`);
+        callback?.({ success: true });
+      } catch (error) {
+        callback?.({ success: false, error: 'Failed to leave team room' });
+      }
+    });
+
+    /**
+     * JOIN PROJECT
+     * Subscribe to project room for real-time task updates
+     * When a task is created/updated/deleted in this project, all members see it
+     */
+    socket.on('join-project', async (data, callback) => {
+      try {
+        const projectId = data?.projectId;
+        if (!projectId) {
+          return callback?.({ success: false, error: 'Invalid project ID' });
+        }
+
+        // Join the project room
+        const roomName = `project:${projectId}`;
+        socket.join(roomName);
+
+        console.log(`${socket.user.username} joined project room: ${roomName}`);
+        callback?.({ success: true });
+      } catch (error) {
+        console.error('Join project error:', error.message);
+        callback?.({ success: false, error: 'Failed to join project room' });
+      }
+    });
+
+    /**
+     * LEAVE PROJECT
+     * Unsubscribe from project room
+     */
+    socket.on('leave-project', async (data, callback) => {
+      try {
+        const projectId = data?.projectId;
+        if (!projectId) {
+          return callback?.({ success: false, error: 'Invalid project ID' });
+        }
+
+        const roomName = `project:${projectId}`;
+        socket.leave(roomName);
+
+        console.log(`${socket.user.username} left project room: ${roomName}`);
+        callback?.({ success: true });
+      } catch (error) {
+        callback?.({ success: false, error: 'Failed to leave project room' });
+      }
+    });
 
     /**
      * JOIN CHANNEL
@@ -312,7 +402,7 @@ export const initializeSocket = (httpServer) => {
         callback?.({ success: true, message });
       } catch (error) {
         console.error('Send message error:', error.message);
-        
+
         // Return user-friendly error
         if (error.message.includes('Access denied') || error.message.includes('not found')) {
           return callback?.({ success: false, error: 'Channel not found or access denied' });
@@ -362,7 +452,7 @@ export const initializeSocket = (httpServer) => {
         const userInChannel = [...users].find(u => u.socketId === socket.id);
         if (userInChannel) {
           users.delete(userInChannel);
-          
+
           // Notify channel that user left
           socket.to(`channel:${channelId}`).emit('user-left', {
             userId: socket.user.id,
