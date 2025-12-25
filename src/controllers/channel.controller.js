@@ -396,6 +396,16 @@ export const createMessage = async (req, res, next) => {
       });
     }
 
+    // Emit real-time events for created message(s) via Socket.io
+    const io = req.app.get('io');
+    if (io) {
+      const roomName = `channel:${channelId}`;
+      createdMessages.forEach((msg) => {
+        io.to(roomName).emit('new-message', msg);
+      });
+      console.log(`[createMessage] Emitted ${createdMessages.length} new-message event(s) to ${roomName}`);
+    }
+
     // Return response
     // If single message, return it directly for backward compatibility
     // If multiple messages, return array
