@@ -60,7 +60,7 @@ export const notifyUser = async (req, res, next) => {
         resourceId,
         timestamp: notification.created_at,
       });
-      console.log(`📤 Notification sent to user:${userId} via Socket.io`);
+      console.log(`Notification sent to user:${userId} via Socket.io`);
     }
 
     res.status(201).json({
@@ -106,7 +106,7 @@ export const notifyBatch = async (req, res, next) => {
         });
         deliveredCount++;
       }
-      console.log(`📤 Batch notifications sent: ${deliveredCount} users`);
+      console.log(`Batch notifications sent: ${deliveredCount} users`);
     }
 
     res.status(201).json({
@@ -148,7 +148,7 @@ export const postBotMessage = async (req, res, next) => {
     const io = req.app.get('io');
     if (io) {
       io.to(`channel:${channelId}`).emit('new-message', message);
-      console.log(`🤖 Bot message posted to channel:${channelId} by ${botUsername}`);
+      console.log(`Bot message posted to channel:${channelId} by ${botUsername}`);
     }
 
     res.status(201).json({
@@ -204,7 +204,7 @@ export const postTeamAnnouncement = async (req, res, next) => {
     const io = req.app.get('io');
     if (io) {
       io.to(`channel:${channel.id}`).emit('new-message', message);
-      console.log(`🤖 Team announcement posted to ${channelName} in team:${teamId}`);
+      console.log(`Team announcement posted to ${channelName} in team:${teamId}`);
     }
 
     res.status(201).json({

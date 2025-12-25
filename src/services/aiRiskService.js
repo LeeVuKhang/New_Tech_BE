@@ -163,7 +163,7 @@ export const gatherProjectContext = async (projectId) => {
 
 /**
  * Calls Google Gemini API with the project context for inference
- * Uses gemini-1.5-flash (free tier) for cost-effective analysis
+ * Uses gemini-2.5-flash (free tier) for cost-effective analysis
  * 
  * @param {Object} context - Aggregated project context
  * @returns {Promise<Object>} Parsed AI response
@@ -421,9 +421,9 @@ export const analyzeProjectRisk = async (projectId, useAI = true) => {
   if (useAI) {
     try {
       analysis = await callGeminiAPI(context);
-      console.log(`✅ Gemini AI inference successful for project ${projectId}`);
+      console.log(`Gemini AI inference successful for project ${projectId}`);
     } catch (error) {
-      console.warn(`⚠️ Gemini API failed, using fallback: ${error.message}`);
+      console.warn(`Gemini API failed, using fallback: ${error.message}`);
       analysis = calculateRiskFallback(context);
     }
   } else {
