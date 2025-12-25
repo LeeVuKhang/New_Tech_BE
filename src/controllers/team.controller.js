@@ -125,23 +125,14 @@ export const getTeamStats = async (req, res, next) => {
 export const getUserTeams = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    
-    // Debug logging
-    console.log('=== GET /api/v1/teams DEBUG ===');
-    console.log('req.user:', req.user);
-    console.log('userId:', userId);
 
     const teams = await TeamModel.getUserTeams(userId);
-    
-    console.log('Teams found:', teams.length);
-    console.log('Teams data:', JSON.stringify(teams, null, 2));
 
     res.status(200).json({
       success: true,
       data: teams,
     });
   } catch (error) {
-    console.error('Error in getUserTeams:', error);
     next(error);
   }
 };

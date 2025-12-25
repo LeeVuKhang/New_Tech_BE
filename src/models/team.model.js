@@ -178,9 +178,6 @@ export const getTeamStats = async (teamId, userId) => {
  * @returns {Promise<Array>} List of teams the user is a member of
  */
 export const getUserTeams = async (userId) => {
-  console.log('=== getUserTeams Model DEBUG ===');
-  console.log('Querying teams for userId:', userId);
-  
   const teams = await db`
     SELECT 
       t.id,
@@ -195,9 +192,6 @@ export const getUserTeams = async (userId) => {
     GROUP BY t.id, t.name, t.description, tm.role
     ORDER BY t.created_at ASC
   `;
-  
-  console.log('Query result:', teams);
-  console.log('Number of teams:', teams.length);
 
   return teams;
 };
@@ -260,7 +254,7 @@ export const updateTeam = async (teamId, userId, updates) => {
   // Build dynamic update query (only update provided fields)
   const updateFields = [];
   const values = [];
-  
+
   if (updates.name !== undefined) {
     updateFields.push('name');
     values.push(updates.name);
@@ -280,7 +274,7 @@ export const updateTeam = async (teamId, userId, updates) => {
 
   // Construct SET clause
   const setClause = updateFields.map((field, idx) => `${field} = $${idx + 1}`).join(', ');
-  
+
   // Execute update
   const [updatedTeam] = await db.unsafe(
     `UPDATE teams 
@@ -345,7 +339,7 @@ export const searchUsersForInvite = async (teamId, searchQuery, requestingUserId
 
   // Search for users matching username or email (case-insensitive partial match)
   const searchPattern = `%${searchQuery}%`;
-  
+
   const users = await db`
     SELECT 
       u.id,
